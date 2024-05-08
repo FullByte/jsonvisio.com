@@ -2,78 +2,189 @@ import React from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import styled from "styled-components";
-import { Button, Center, Container, Stack } from "@mantine/core";
+import {
+  TextInput,
+  PasswordInput,
+  Paper,
+  PaperProps,
+  Button,
+  Divider,
+  Anchor,
+  Stack,
+  Center,
+  Text,
+} from "@mantine/core";
+import { toast } from "react-hot-toast";
 import { AiOutlineGithub, AiOutlineGoogle } from "react-icons/ai";
-import { altogic } from "src/api/altogic";
-import { Footer } from "src/layout/Footer";
-import { Navbar } from "src/layout/Navbar";
+import Layout from "src/layout/Layout";
+import { supabase } from "src/lib/api/supabase";
+import { isIframe } from "src/lib/utils/widget";
 import useUser from "src/store/useUser";
 
-const StyledPageWrapper = styled.div`
-  padding: 5%;
-`;
-
-const StyledHeroSection = styled.section`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const SignIn = () => {
-  const { isReady, replace } = useRouter();
-  const checkSession = useUser(state => state.checkSession);
+export function AuthenticationForm(props: PaperProps) {
+  const { push } = useRouter();
+  const setSession = useUser(state => state.setSession);
   const isAuthenticated = useUser(state => state.isAuthenticated);
+  const [sessionLoading, setSessionLoading] = React.useState(false);
+  const [userData, setUserData] = React.useState({
+    name: "",
+    email: "",
+    password: "",
+  });
 
-  React.useEffect(() => {
-    if (!isReady) checkSession();
-    if (isAuthenticated) replace("/editor");
-  }, [isReady, isAuthenticated, replace, checkSession]);
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSessionLoading(true);
 
-  const handleLoginClick = (provider: "github" | "google") => {
-    altogic.auth.signInWithProvider(provider);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: userData.email,
+      password: userData.password,
+    });
+
+    if (error) {
+      setSessionLoading(false);
+      return toast.error(error.message);
+    }
+
+    await setSession(data.session);
+    push("/editor");
+    setSessionLoading(false);
   };
 
+  const handleLoginClick = async (provider: "github" | "google") => {
+    setSessionLoading(true);
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/editor` },
+    });
+    setSessionLoading(false);
+  };
+
+  if (isAuthenticated) {
+    return (
+      <Paper p="lg" maw={400} style={{ textAlign: "center" }}>
+        <Text fz="sm" c="dark">
+          You are already signed in. Click the button below to go to the editor.
+        </Text>
+        <Link href="/editor">
+          <Button mt="lg" color="dark" size="lg">
+            GO TO EDITOR
+          </Button>
+        </Link>
+      </Paper>
+    );
+  }
+
   return (
-    <>
+    <Paper {...props} style={{ textAlign: "left" }}>
+      <form onSubmit={onSubmit}>
+        <Stack>
+          <TextInput
+            name="email"
+            required
+            label="Email"
+            placeholder="hello@jsoncrack.com"
+            value={userData.email}
+            onChange={event => setUserData(d => ({ ...d, email: event.target.value }))}
+            radius="sm"
+            style={{ color: "black" }}
+          />
+
+          <PasswordInput
+            name="password"
+            required
+            label="Password"
+            placeholder="∗∗∗∗∗∗∗∗∗∗∗"
+            value={userData.password}
+            onChange={event => setUserData(d => ({ ...d, password: event.target.value }))}
+            radius="sm"
+            style={{ color: "black" }}
+          />
+
+          <Button color="dark" type="submit" radius="sm" loading={sessionLoading}>
+            Sign in
+          </Button>
+
+          <Stack gap="sm" mx="auto" align="center">
+            <Anchor component={Link} prefetch={false} href="/forgot-password" c="dark" size="xs">
+              Forgot your password?
+            </Anchor>
+          </Stack>
+        </Stack>
+      </form>
+
+      <Divider my="lg" />
+
+      <Stack mb="md" mt="md">
+        <Button
+          radius="sm"
+          leftSection={<AiOutlineGoogle size="20" />}
+          onClick={() => handleLoginClick("google")}
+          color="red"
+          variant="outline"
+        >
+          Sign in with Google
+        </Button>
+        <Button
+          radius="sm"
+          leftSection={<AiOutlineGithub size="20" />}
+          onClick={() => handleLoginClick("github")}
+          color="dark"
+          variant="outline"
+        >
+          Sign in with GitHub
+        </Button>
+      </Stack>
+    </Paper>
+  );
+}
+
+const SignIn = () => {
+  const { isReady, push, query } = useRouter();
+  const hasSession = useUser(state => !!state.user);
+  const setSession = useUser(state => state.setSession);
+  const isPasswordReset = query?.type === "recovery" && !query?.error;
+
+  React.useEffect(() => {
+    if (isIframe()) {
+      push("/");
+      return;
+    }
+
+    if (!isReady) return;
+
+    if (query?.access_token && query?.refresh_token) {
+      (async () => {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: query.access_token as string,
+          refresh_token: query.refresh_token as string,
+        });
+
+        if (error) return toast.error(error.message);
+        if (data.session) setSession(data.session);
+      })();
+    }
+
+    if (hasSession && !isPasswordReset) push("/editor");
+  }, [isReady, hasSession, push, isPasswordReset, query, setSession]);
+
+  if (!isReady) return null;
+
+  return (
+    <Layout>
       <Head>
-        <title>Sign In | JSON Crack</title>
+        <title>Sign In - JSON Crack</title>
+        <link rel="canonical" href="https://app.jsoncrack.com/sign-in" />
       </Head>
-      <Navbar />
-      <StyledPageWrapper>
-        <StyledHeroSection>
-          <Link href="/">
-            <img src="assets/icon.png" alt="json crack" width="400" />
-          </Link>
-          <h1>Sign In</h1>
-        </StyledHeroSection>
-        <Container>
-          <Center>
-            <Stack my={60} w={250} spacing="xl">
-              <Button
-                size="md"
-                color="red"
-                onClick={() => handleLoginClick("google")}
-                leftIcon={<AiOutlineGoogle size={24} />}
-              >
-                Sign In with Google
-              </Button>
-              <Button
-                size="md"
-                variant="white"
-                color="gray"
-                onClick={() => handleLoginClick("github")}
-                leftIcon={<AiOutlineGithub size={24} />}
-              >
-                Sign In with GitHub
-              </Button>
-            </Stack>
-          </Center>
-        </Container>
-      </StyledPageWrapper>
-      <Footer />
-    </>
+      <Paper mt={100} mx="auto" maw={400} p="lg" withBorder>
+        <AuthenticationForm />
+      </Paper>
+      <Center my="xl">
+        <Anchor component={Link} prefetch={false} href="/sign-up" c="gray.5" fw="bold">
+          Don&apos;t have an account?
+        </Anchor>
+      </Center>
+    </Layout>
   );
 };
 

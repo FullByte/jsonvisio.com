@@ -1,114 +1,81 @@
 import React from "react";
 import type { AppProps } from "next/app";
-import localFont from "next/font/local";
+import dynamic from "next/dynamic";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import { MantineProvider, createTheme } from "@mantine/core";
+import "@mantine/core/styles.css";
+import "@mantine/code-highlight/styles.css";
 import { ThemeProvider } from "styled-components";
-import { MantineProvider } from "@mantine/core";
-import { init } from "@sentry/nextjs";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "react-hot-toast";
-import { GoogleAnalytics } from "src/components/GoogleAnalytics";
+import ReactGA from "react-ga4";
+import { Loading } from "src/components/Loading";
 import GlobalStyle from "src/constants/globalStyle";
-import { darkTheme, lightTheme } from "src/constants/theme";
-import { ModalController } from "src/layout/ModalController";
-import useStored from "src/store/useStored";
+import { lightTheme } from "src/constants/theme";
+import { supabase } from "src/lib/api/supabase";
+import useUser from "src/store/useUser";
 
-if (process.env.NODE_ENV !== "development") {
-  init({
-    dsn: "https://d3345591295d4dd1b8c579b62003d939@o1284435.ingest.sentry.io/6495191",
-    tracesSampleRate: 0.25,
-    release: "production",
-  });
-}
+const Toaster = dynamic(() => import("react-hot-toast").then(c => c.Toaster));
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: false,
-    },
-  },
-});
+const isDevelopment = process.env.NODE_ENV === "development";
+const GA_TRACKING_ID = process.env.NEXT_PUBLIC_GA_ID;
 
-const monaSans = localFont({
-  src: "../pages/Mona-Sans.woff2",
-  variable: "--mona-sans",
-  display: "swap",
-  fallback: ["Arial, Helvetica, sans-serif", "Tahoma, Verdana, sans-serif"],
+ReactGA.initialize(GA_TRACKING_ID, { testMode: isDevelopment });
+
+const mantineTheme = createTheme({
+  primaryShade: 8,
 });
 
 function JsonCrack({ Component, pageProps }: AppProps) {
-  const [isReady, setReady] = React.useState(false);
-  const lightmode = useStored(state => state.lightmode);
+  const router = useRouter();
+  const setSession = useUser(state => state.setSession);
 
   React.useEffect(() => {
-    setReady(true);
-  }, []);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setSession(session);
+    });
+  }, [setSession]);
 
-  if (isReady)
-    return (
-      <QueryClientProvider client={queryClient}>
-        <GoogleAnalytics />
-        <ThemeProvider theme={lightmode ? lightTheme : darkTheme}>
-          <GlobalStyle />
-          {}
-          <MantineProvider
-            withGlobalStyles
-            withNormalizeCSS
-            withCSSVariables
-            theme={{
-              colorScheme: lightmode ? "light" : "dark",
-              fontFamily: monaSans.style.fontFamily,
-              components: {
-                Divider: {
-                  styles: () => ({
-                    root: {
-                      borderTopColor: "#4D4D4D !important",
-                    },
-                  }),
-                },
-                Modal: {
-                  styles: theme => ({
-                    title: {
-                      fontWeight: 700,
-                    },
-                    header: {
-                      backgroundColor: theme.colorScheme === "dark" ? "#36393E" : "#FFFFFF",
-                    },
-                    body: {
-                      backgroundColor: theme.colorScheme === "dark" ? "#36393E" : "#FFFFFF",
-                    },
-                  }),
-                },
-                Button: {
-                  styles: theme => ({
-                    inner: {
-                      fontWeight: 700,
-                    },
-                  }),
-                },
+  React.useEffect(() => {
+    const handleRouteChange = (page: string) => {
+      ReactGA.send({ hitType: "pageview", page });
+    };
+
+    router.events.on("routeChangeComplete", handleRouteChange);
+
+    return () => {
+      router.events.off("routeChangeComplete", handleRouteChange);
+    };
+  }, [router.events]);
+
+  return (
+    <>
+      <Head>
+        <title>JSON Crack | Best JSON Visualizer, Formatter and Viewer for everyone</title>
+      </Head>
+      <MantineProvider theme={mantineTheme}>
+        <ThemeProvider theme={lightTheme}>
+          <Toaster
+            position="bottom-right"
+            containerStyle={{
+              bottom: 34,
+              right: 8,
+              fontSize: 14,
+            }}
+            toastOptions={{
+              style: {
+                background: "#4D4D4D",
+                color: "#B9BBBE",
+                borderRadius: 4,
               },
             }}
-          >
-            <Component {...pageProps} />
-            <ModalController />
-            <Toaster
-              position="top-right"
-              containerStyle={{
-                top: 40,
-                right: 6,
-                fontSize: 14,
-              }}
-              toastOptions={{
-                style: {
-                  background: "#4D4D4D",
-                  color: "#B9BBBE",
-                },
-              }}
-            />
-          </MantineProvider>
+          />
+          <GlobalStyle />
+          <Loading />
+          <Component {...pageProps} />
         </ThemeProvider>
-      </QueryClientProvider>
-    );
+      </MantineProvider>
+    </>
+  );
 }
 
 export default JsonCrack;

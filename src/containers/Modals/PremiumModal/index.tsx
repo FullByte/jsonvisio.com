@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import {
   Modal,
   ModalProps,
@@ -9,26 +10,21 @@ import {
   List,
   ThemeIcon,
   Divider,
-  Text,
-  Badge,
 } from "@mantine/core";
 import { BsCheck } from "react-icons/bs";
+import { MdChevronRight } from "react-icons/md";
 
 export const PremiumModal: React.FC<ModalProps> = ({ opened, onClose }) => {
   return (
-    <Modal title="Your Plan" size="auto" opened={opened} onClose={onClose} centered>
-      <Flex gap="lg">
-        <Stack spacing="xs">
-          <Title order={3}>
-            Free plan
-            <Text size="sm" color="dimmed">
-              (Free)
-            </Text>
-          </Title>
-          <Button variant="filled" color="dark" size="md">
+    <Modal title="Upgrade Plan" size="auto" opened={opened} onClose={onClose} centered zIndex={202}>
+      <Flex gap="lg" justify="center" px="md">
+        <Stack gap="xs">
+          <Title order={3}>Free</Title>
+          <Button variant="outline" color="dark" size="md">
             Your current plan
           </Button>
           <List
+            mt="xs"
             spacing="xs"
             size="sm"
             center
@@ -38,29 +34,27 @@ export const PremiumModal: React.FC<ModalProps> = ({ opened, onClose }) => {
               </ThemeIcon>
             }
           >
-            <List.Item>Store up to 15 files</List.Item>
-            <List.Item>Visualize standard size data</List.Item>
+            <List.Item>Limited capability visualization</List.Item>
+            <List.Item>Store/Share up to 15 files</List.Item>
           </List>
         </Stack>
         <Divider color="gray" orientation="vertical" />
-        <Stack spacing="xs">
-          <Title order={3}>
-            JSON Crack Plus
-            <Text size="sm" color="dimmed">
-              USD 5$/mo
-            </Text>
-          </Title>
+        <Stack gap="xs">
+          <Title order={3}>Premium</Title>
           <Button
-            component="a"
-            href="https://www.patreon.com/join/herowand/checkout?rid=8549056"
+            component={Link}
+            prefetch={false}
+            href="/pricing"
+            target="_blank"
             variant="filled"
             color="teal"
             size="md"
-            target="_blank"
+            rightSection={<MdChevronRight size="24" />}
           >
-            Upgrade plan
+            Start 3 Days Free Trial
           </Button>
           <List
+            mt="xs"
             spacing="xs"
             size="sm"
             center
@@ -70,27 +64,12 @@ export const PremiumModal: React.FC<ModalProps> = ({ opened, onClose }) => {
               </ThemeIcon>
             }
           >
-            <List.Item>JSON Schema support</List.Item>
-            <List.Item>Visualize data at full capability</List.Item>
-            <List.Item>Save up to 200 files</List.Item>
-            <List.Item
-              icon={
-                <ThemeIcon color="dark.5" size={20} radius="xl">
-                  <BsCheck size="1rem" />
-                </ThemeIcon>
-              }
-            >
-              Edit directly on graph <Badge>Soon</Badge>
-            </List.Item>
-            <List.Item
-              icon={
-                <ThemeIcon color="dark.5" size={20} radius="xl">
-                  <BsCheck size="1rem" />
-                </ThemeIcon>
-              }
-            >
-              Gerenate links from API <Badge>Soon</Badge>
-            </List.Item>
+            <List.Item>5X Faster visualizations, no lagging</List.Item>
+            <List.Item>Accurate and compact graphs</List.Item>
+            <List.Item>Edit data through visualizations</List.Item>
+            <List.Item>Visualize data up to 5 MBs</List.Item>
+            <List.Item>Compare data on graphs</List.Item>
+            <List.Item>Save & share up to 200 files</List.Item>
           </List>
         </Stack>
       </Flex>

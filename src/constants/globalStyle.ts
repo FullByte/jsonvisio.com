@@ -1,37 +1,25 @@
-import localFont from "next/font/local";
 import { createGlobalStyle } from "styled-components";
-
-const monaSans = localFont({
-  src: "../pages/Mona-Sans.woff2",
-  variable: "--mona-sans",
-  display: "swap",
-  fallback: ["Arial, Helvetica, sans-serif", "Tahoma, Verdana, sans-serif"],
-});
 
 const GlobalStyle = createGlobalStyle`
   html, body {
-    color: ${({ theme }) => theme.FULL_WHITE} !important;
-    font-weight: 400;
-    font-size: 16px;
-    font-family: ${monaSans.style.fontFamily};
-    background: #141517;
-
-    @media only screen and (max-width: 768px) {
-      background-position: right;
-    }
+    background: #ffffff;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: subpixel-antialiased !important;
   }
 
-  * {
-    -webkit-tap-highlight-color: transparent;
-    scroll-behavior: smooth !important;
+  *,
+  *::before,
+  *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      scroll-behavior: smooth !important;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: never;
   }
 
   .hide {
     display: none;
-  }
-
-  .mantine-Modal-inner {
-    padding: 0;
   }
 
   svg {
@@ -51,92 +39,6 @@ const GlobalStyle = createGlobalStyle`
     margin: 0;
     padding: 0;
     cursor: pointer;
-  }
-
-  #carbonads * {
-    margin: initial;
-    padding: initial;
-    line-height: initial;
-  }
-
-  #carbonads {
-    --carbon-font-size: 16px;
-    --carbon-padding-size: 12px;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  #carbonads {
-    display: inline-block;
-
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
-      Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue',
-      Helvetica, Arial, sans-serif;
-    font-size: var(--carbon-font-size);
-  }
-
-  #carbonads > span {
-    min-width: 18.75em;
-    max-width: clamp(18.75em, 22.5em, 24.5em);
-    min-height: 100px;
-    background-color: ${({ theme }) => theme.BACKGROUND_SECONDARY};
-    box-shadow: 0 0 1px hsl(0deg 0% 0% / 0.085),
-      0 0 2px hsl(0deg 0% 0% / 0.085),
-      0 0 4px hsl(0deg 0% 0% / 0.085),
-      0 0 8px hsl(0deg 0% 0% / 0.085);
-  }
-
-  #carbonads a {
-    text-decoration: none;
-    color: ${({ theme }) => theme.INTERACTIVE_NORMAL};
-  }
-
-  #carbonads a:hover {
-    color: ${({ theme }) => theme.INTERACTIVE_HOVER};
-  }
-
-  #carbonads span {
-    display: block;
-    position: relative;
-  }
-
-  #carbonads .carbon-wrap {
-    display: flex;
-  }
-
-  #carbonads .carbon-img {
-    height: 100px;
-    width: 130px;
-  }
-
-  #carbonads .carbon-img img {
-    display: block;
-  }
-
-  #carbonads .carbon-text {
-    padding: 0.625em 1em;
-
-    font-size: 0.8125em;
-    margin-bottom: 1em;
-    line-height: 1.4;
-    text-align: left;
-  }
-
-  #carbonads .carbon-poweredby {
-    display: block;
-    padding: 6px 8px;
-    color: ${({ theme }) => theme.TEXT_NORMAL};
-    background: ${({ theme }) => theme.BACKGROUND_TERTIARY};
-    text-align: center;
-    text-transform: uppercase;
-    letter-spacing: 0.1ch;
-    font-weight: 600;
-    font-size: 0.5em;
-    line-height: 1;
-    border-top-left-radius: 3px;
-    position: absolute;
-    bottom: 0;
-    right: 0;
   }
 `;
 

@@ -1,8 +1,18 @@
 # Builder
-FROM node:16-alpine as builder
+FROM node:18-alpine as builder
+# Reference :: https://pnpm.io/docker
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 WORKDIR /src
+
+# Cache dependencies first
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install
+
+# Copy other files and build
 COPY . /src/
-RUN yarn install --frozen-lockfile && yarn build
+RUN pnpm build
 
 # App
 FROM nginxinc/nginx-unprivileged

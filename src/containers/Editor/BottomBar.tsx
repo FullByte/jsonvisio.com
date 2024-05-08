@@ -1,8 +1,8 @@
 import React from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
+import { Flex, Popover, Text } from "@mantine/core";
 import styled from "styled-components";
-import { Flex, Text } from "@mantine/core";
 import toast from "react-hot-toast";
 import {
   AiOutlineCloudSync,
@@ -11,25 +11,30 @@ import {
   AiOutlineLock,
   AiOutlineUnlock,
 } from "react-icons/ai";
-import { MdReportGmailerrorred, MdOutlineCheckCircleOutline } from "react-icons/md";
-import { VscAccount, VscWorkspaceTrusted } from "react-icons/vsc";
-import { saveToCloud, updateJson } from "src/services/json";
+import { BiSolidDockLeft } from "react-icons/bi";
+import { MdOutlineCheckCircleOutline } from "react-icons/md";
+import { TbTransform } from "react-icons/tb";
+import { VscError, VscFeedback, VscSourceControl, VscSync, VscSyncIgnored } from "react-icons/vsc";
+import { documentSvc } from "src/services/document.service";
+import useConfig from "src/store/useConfig";
 import useFile from "src/store/useFile";
+import useGraph from "src/store/useGraph";
 import useModal from "src/store/useModal";
-import useStored from "src/store/useStored";
 import useUser from "src/store/useUser";
 
 const StyledBottomBar = styled.div`
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-top: 1px solid ${({ theme }) => theme.BACKGROUND_MODIFIER_ACCENT};
-  background: ${({ theme }) => theme.BACKGROUND_TERTIARY};
+  background: ${({ theme }) => theme.TOOLBAR_BG};
   max-height: 27px;
   height: 27px;
-  padding: 0 6px;
+  z-index: 35;
+  padding-right: 6px;
 
-  @media only screen and (max-width: 768px) {
+  @media screen and (max-width: 320px) {
     display: none;
   }
 `;
@@ -39,6 +44,11 @@ const StyledLeft = styled.div`
   align-items: center;
   justify-content: left;
   gap: 4px;
+  padding-left: 8px;
+
+  @media screen and (max-width: 480px) {
+    display: none;
+  }
 `;
 
 const StyledRight = styled.div`
@@ -48,7 +58,7 @@ const StyledRight = styled.div`
   gap: 4px;
 `;
 
-const StyledBottomBarItem = styled.button<{ error?: boolean }>`
+const StyledBottomBarItem = styled.button<{ $bg?: string }>`
   display: flex;
   align-items: center;
   gap: 4px;
@@ -58,8 +68,11 @@ const StyledBottomBarItem = styled.button<{ error?: boolean }>`
   padding: 4px;
   font-size: 12px;
   font-weight: 400;
-  color: ${({ theme, error }) => (error ? theme.DANGER : theme.INTERACTIVE_NORMAL)};
-  background: ${({ error }) => error && "rgba(255, 99, 71, 0.4)"};
+  color: ${({ theme }) => theme.INTERACTIVE_NORMAL};
+  background: ${({ $bg }) => $bg};
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 
   &:hover:not(&:disabled) {
     background-image: linear-gradient(rgba(0, 0, 0, 0.1) 0 0);
@@ -67,29 +80,33 @@ const StyledBottomBarItem = styled.button<{ error?: boolean }>`
   }
 
   &:disabled {
-    opacity: 0.4;
+    opacity: 0.6;
     cursor: default;
   }
 `;
 
-const StyledImg = styled.img<{ light: boolean }>`
-  filter: ${({ light }) => light && "invert(100%)"};
-`;
-
 export const BottomBar = () => {
-  const { replace, query } = useRouter();
+  const { query, replace } = useRouter();
   const data = useFile(state => state.fileData);
-  const error = useFile(state => state.error);
   const user = useUser(state => state.user);
-  const premium = useUser(state => state.isPremium());
-  const lightmode = useStored(state => state.lightmode);
+  const toggleLiveTransform = useConfig(state => state.toggleLiveTransform);
+  const liveTransformEnabled = useConfig(state => state.liveTransformEnabled);
   const hasChanges = useFile(state => state.hasChanges);
+  const error = useFile(state => state.error);
   const getContents = useFile(state => state.getContents);
+  const setContents = useFile(state => state.setContents);
+  const nodeCount = useGraph(state => state.nodes.length);
+  const fileName = useFile(state => state.fileData?.name);
+  const toggleFullscreen = useGraph(state => state.toggleFullscreen);
+  const fullscreen = useGraph(state => state.fullscreen);
 
   const setVisible = useModal(state => state.setVisible);
   const setHasChanges = useFile(state => state.setHasChanges);
+  const getFormat = useFile(state => state.getFormat);
   const [isPrivate, setIsPrivate] = React.useState(false);
   const [isUpdating, setIsUpdating] = React.useState(false);
+
+  const toggleEditor = () => toggleFullscreen(!fullscreen);
 
   React.useEffect(() => {
     setIsPrivate(data?.private ?? true);
@@ -101,48 +118,58 @@ export const BottomBar = () => {
     if (
       hasChanges &&
       !error &&
-      (typeof query.doc === "string" || typeof query.doc === "undefined")
+      (typeof query.json === "string" || typeof query.json === "undefined")
     ) {
       try {
         setIsUpdating(true);
         toast.loading("Saving document...", { id: "fileSave" });
-        const res = await saveToCloud(query?.doc ?? null, getContents());
 
-        if (res.errors && res.errors.items.length > 0) throw res.errors;
-        if (res.data._id) replace({ query: { doc: res.data._id } });
+        const { data, error } = await documentSvc.upsert({
+          id: query?.json,
+          contents: getContents(),
+          format: getFormat(),
+        });
+
+        if (error) throw error;
+        if (data) replace({ query: { json: data } });
 
         toast.success("Document saved to cloud", { id: "fileSave" });
         setHasChanges(false);
       } catch (error: any) {
-        if (error?.items?.length > 0) {
-          return toast.error(error.items[0].message, { id: "fileSave", duration: 5000 });
-        }
-
-        toast.error("Failed to save document!", { id: "fileSave" });
+        toast.error(error.message, { id: "fileSave" });
       } finally {
         setIsUpdating(false);
       }
     }
-  }, [error, getContents, hasChanges, query.doc, replace, setHasChanges, setVisible, user]);
-
-  const handleLoginClick = () => {
-    if (user) return setVisible("account")(true);
-    else setVisible("login")(true);
-  };
+  }, [
+    error,
+    getContents,
+    getFormat,
+    hasChanges,
+    query.json,
+    replace,
+    setHasChanges,
+    setVisible,
+    user,
+  ]);
 
   const setPrivate = async () => {
     try {
       if (!query.json) return handleSaveJson();
       setIsUpdating(true);
 
-      const res = await updateJson(query.json as string, { private: !isPrivate });
+      const { data: updatedJsonData, error } = await documentSvc.update(query.json as string, {
+        private: !isPrivate,
+      });
 
-      if (!res.errors?.items.length) {
-        setIsPrivate(res.data.private);
+      if (error) return toast.error(error.message);
+
+      if (updatedJsonData[0]) {
+        setIsPrivate(updatedJsonData[0].private);
         toast.success(`Document set to ${isPrivate ? "public" : "private"}.`);
-      } else throw res.errors;
+      } else throw error;
     } catch (error) {
-      toast.error("An error occurred while updating document!");
+      console.error(error);
     } finally {
       setIsUpdating(false);
     }
@@ -156,65 +183,86 @@ export const BottomBar = () => {
         </Head>
       )}
       <StyledLeft>
-        <StyledBottomBarItem onClick={handleLoginClick}>
-          <VscAccount />
-          {user ? user.name : "Login"}
+        <StyledBottomBarItem onClick={toggleEditor}>
+          <BiSolidDockLeft />
         </StyledBottomBarItem>
-        {!premium && (
-          <StyledBottomBarItem onClick={() => setVisible("premium")(true)}>
-            <VscWorkspaceTrusted />
-            Upgrade to Premium
+
+        {fileName && (
+          <StyledBottomBarItem onClick={() => setVisible("cloud")(true)}>
+            <VscSourceControl />
+            {fileName}
           </StyledBottomBarItem>
         )}
-        <StyledBottomBarItem error={!!error}>
+        <StyledBottomBarItem>
           {error ? (
-            <Flex align="center" gap={2}>
-              <MdReportGmailerrorred color="red" size={16} />
-              <Text fw="bold">Invalid Format</Text>
-            </Flex>
+            <Popover width="auto" shadow="md" position="top" withArrow>
+              <Popover.Target>
+                <Flex align="center" gap={2}>
+                  <VscError color="red" size={16} />
+                  <Text c="red" fw={500} fz="xs">
+                    Invalid
+                  </Text>
+                </Flex>
+              </Popover.Target>
+              <Popover.Dropdown
+                style={{
+                  pointerEvents: "none",
+                }}
+              >
+                <Text size="xs">{error}</Text>
+              </Popover.Dropdown>
+            </Popover>
           ) : (
             <Flex align="center" gap={2}>
               <MdOutlineCheckCircleOutline />
-              <Text>Valid Format</Text>
+              <Text size="xs">Valid</Text>
             </Flex>
           )}
         </StyledBottomBarItem>
-        <StyledBottomBarItem onClick={handleSaveJson} disabled={isUpdating}>
-          {hasChanges ? <AiOutlineCloudUpload /> : <AiOutlineCloudSync />}
-          {hasChanges ? "Unsaved Changes" : "Saved"}
+        {(data?.owner_email === user?.email || (!data && user)) && (
+          <StyledBottomBarItem onClick={handleSaveJson} disabled={isUpdating || error}>
+            {hasChanges || !user ? <AiOutlineCloudUpload /> : <AiOutlineCloudSync />}
+            {hasChanges || !user ? (query?.json ? "Unsaved Changes" : "Save to Cloud") : "Saved"}
+          </StyledBottomBarItem>
+        )}
+        {data?.owner_email === user?.email && (
+          <StyledBottomBarItem onClick={setPrivate} disabled={isUpdating}>
+            {isPrivate ? <AiOutlineLock /> : <AiOutlineUnlock />}
+            {isPrivate ? "Private" : "Public"}
+          </StyledBottomBarItem>
+        )}
+        <StyledBottomBarItem
+          onClick={() => setVisible("share")(true)}
+          disabled={isPrivate || !data}
+        >
+          <AiOutlineLink />
+          Share
         </StyledBottomBarItem>
-        {data && (
-          <>
-            {typeof data.private !== "undefined" && (
-              <StyledBottomBarItem onClick={setPrivate} disabled={isUpdating}>
-                {isPrivate ? <AiOutlineLock /> : <AiOutlineUnlock />}
-                {isPrivate ? "Private" : "Public"}
-              </StyledBottomBarItem>
-            )}
-            <StyledBottomBarItem onClick={() => setVisible("share")(true)} disabled={isPrivate}>
-              <AiOutlineLink />
-              Share
-            </StyledBottomBarItem>
-          </>
+        {liveTransformEnabled ? (
+          <StyledBottomBarItem onClick={() => toggleLiveTransform(false)}>
+            <VscSync />
+            <Text fz="xs">Live Transform</Text>
+          </StyledBottomBarItem>
+        ) : (
+          <StyledBottomBarItem onClick={() => toggleLiveTransform(true)}>
+            <VscSyncIgnored />
+            <Text fz="xs">Manual Transform</Text>
+          </StyledBottomBarItem>
+        )}
+        {!liveTransformEnabled && (
+          <StyledBottomBarItem onClick={() => setContents({})}>
+            <TbTransform />
+            Transform
+          </StyledBottomBarItem>
         )}
       </StyledLeft>
+
       <StyledRight>
-        <a
-          href="https://www.altogic.com/?utm_source=jsoncrack&utm_medium=referral&utm_campaign=sponsorship"
-          rel="sponsored noreferrer"
-          target="_blank"
-        >
-          <StyledBottomBarItem>
-            Powered by
-            <StyledImg
-              height="20"
-              width="54"
-              src="https://www.altogic.com/img/logo_dark.svg"
-              alt="powered by altogic"
-              light={lightmode}
-            />
-          </StyledBottomBarItem>
-        </a>
+        <StyledBottomBarItem>Nodes: {nodeCount}</StyledBottomBarItem>
+        <StyledBottomBarItem onClick={() => setVisible("review")(true)}>
+          <VscFeedback />
+          Feedback
+        </StyledBottomBarItem>
       </StyledRight>
     </StyledBottomBar>
   );

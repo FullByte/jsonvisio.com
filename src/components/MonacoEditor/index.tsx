@@ -1,9 +1,9 @@
 import React from "react";
+import { LoadingOverlay } from "@mantine/core";
 import styled from "styled-components";
-import Editor, { loader, Monaco, useMonaco } from "@monaco-editor/react";
-import { Loading } from "src/layout/Loading";
+import Editor, { loader, useMonaco } from "@monaco-editor/react";
+import useConfig from "src/store/useConfig";
 import useFile from "src/store/useFile";
-import useStored from "src/store/useStored";
 
 loader.config({
   paths: {
@@ -21,7 +21,7 @@ const editorOptions = {
 
 const StyledWrapper = styled.div`
   display: grid;
-  height: calc(100vh - 36px);
+  height: calc(100vh - 67px);
   grid-template-columns: 100%;
   grid-template-rows: minmax(0, 1fr);
 `;
@@ -33,34 +33,25 @@ export const MonacoEditor = () => {
   const setError = useFile(state => state.setError);
   const jsonSchema = useFile(state => state.jsonSchema);
   const getHasChanges = useFile(state => state.getHasChanges);
-  const theme = useStored(state => (state.lightmode ? "light" : "vs-dark"));
+  const theme = useConfig(state => (state.darkmodeEnabled ? "vs-dark" : "light"));
+  const fileType = useFile(state => state.format);
 
   React.useEffect(() => {
-    if (monaco) {
-      monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-        validate: true,
-        ...(jsonSchema && {
-          schemas: [
-            {
-              fileMatch: ["*"],
-              schema: jsonSchema,
-            },
-          ],
-        }),
-      });
-    }
-  }, [jsonSchema, monaco]);
-
-  const handleEditorWillMount = React.useCallback(
-    (monaco: Monaco) => {
-      monaco.editor.onDidChangeMarkers(([uri]) => {
-        const markers = monaco.editor.getModelMarkers({ resource: uri });
-        if (markers.length) setError(markers[0].message);
-        else setError(null);
-      });
-    },
-    [setError]
-  );
+    monaco?.languages.json.jsonDefaults.setDiagnosticsOptions({
+      validate: true,
+      allowComments: true,
+      enableSchemaRequest: true,
+      ...(jsonSchema && {
+        schemas: [
+          {
+            uri: "http://myserver/foo-schema.json",
+            fileMatch: ["*"],
+            schema: jsonSchema,
+          },
+        ],
+      }),
+    });
+  }, [jsonSchema, monaco?.languages.json.jsonDefaults]);
 
   React.useEffect(() => {
     const beforeunload = (e: BeforeUnloadEvent) => {
@@ -83,14 +74,14 @@ export const MonacoEditor = () => {
   return (
     <StyledWrapper>
       <Editor
-        value={contents}
-        theme={theme}
-        options={editorOptions}
-        onChange={e => setContents({ contents: e, skipUpdate: true })}
-        loading={<Loading message="Loading Editor..." />}
-        beforeMount={handleEditorWillMount}
-        language="json"
         height="100%"
+        language={fileType}
+        theme={theme}
+        value={contents}
+        options={editorOptions}
+        onValidate={errors => setError(errors[0]?.message)}
+        onChange={contents => setContents({ contents, skipUpdate: true })}
+        loading={<LoadingOverlay visible />}
       />
     </StyledWrapper>
   );
